@@ -85,8 +85,17 @@ static void rx_task(void *arg)
 {
 
 	uint8_t* data = (uint8_t*) malloc (RX_BUF_SIZE+1);
+	// static char** gpgga = (char**)malloc(sizeof(char*));
+	// gpgga[0] = (char*)malloc(sizeof(char)*129);
+	// static char** gpvtg = (char**)malloc(sizeof(char*));
+	// gpvtg[0] = (char*)malloc(sizeof(char)*129);
 	//static const char *RX_TASK_TAG = "RX_TASK";
 	//esp_log_level_set(RX_TASK_TAG, ESP_LOG_INFO);
+	static char display_text_1[64];
+	static char display_text_2[64];
+	static char display_text_3[64];
+	static char display_text_4[64];
+	static char display_text_5[64];
 	while (1)
 	{
 		const int rxBytes = uart_read_bytes(UART, data, RX_BUF_SIZE, pdMS_TO_TICKS(200));
@@ -105,28 +114,38 @@ static void rx_task(void *arg)
 
 			char** raw_coords = split_to_sentences(gpgga[0], ",", 0, 0);
 			char** raw_speed = split_to_sentences(gpvtg[0], ",", 0, 0);
-		    for (int i = 0; i < 10; i++)
-		    {
-		        memmove(raw_coords[i], raw_coords[i]+1, strlen(raw_coords[i]));
-		    }
-			for (int i = 0; i < 10; i++)
-		    {
-		        memmove(raw_speed[i], raw_speed[i]+1, strlen(raw_speed[i]));
-		    }
+		    // for (int i = 0; i < 10; i++)
+		    // {
+		    //     memmove(raw_coords[i], raw_coords[i]+1, strlen(raw_coords[i]));
+		    // }
+			// for (int i = 0; i < 10; i++)
+		    // {
+		    //     memmove(raw_speed[i], raw_speed[i]+1, strlen(raw_speed[i]));
+		    // }
 
-		    char display_text_1[64];
-		    char display_text_2[64];
-		    char display_text_3[64];
-		    char display_text_4[64];
-			char display_text_5[64];
 					    //get_substring((char*) data, display_text_1, 0, 70);
 
+			// char lat_degs[2];
+			// char lat_mins[7];
+			// get_substring(raw_coords[2], lat_degs, 0, 2);
+			// get_substring(raw_coords[2], lat_mins, 2, 7);
 
+			// char long_degs[3];
+			// char long_mins[7];
+			// get_substring(raw_coords[4], long_degs, 0, 3);
+			// get_substring(raw_coords[4], long_mins, 3, 7);
+
+			// float latitude = (float) atoll(lat_degs) + (float) atoll(lat_mins)*0.166667;
+			// char lat_direction = raw_coords[3][0];
+			// float longitude = (float) atoll(long_degs) + (float) atoll(long_mins)*0.166667;
+			// char long_direction = raw_coords[5][0];
 
 			float latitude = (float) atoll(raw_coords[2]);
 			char lat_direction = raw_coords[3][0];
 			float longitude = (float) atoll(raw_coords[4]);
 			char long_direction = raw_coords[5][0];
+
+
 			float time = (float) atoll(raw_coords[1]);
 			int satellites_num = (int) atoi(raw_coords[7]);
 			float height = (float)atoll(raw_coords[9]);
@@ -146,11 +165,11 @@ static void rx_task(void *arg)
 
 			//ESP_LOGI(RX_TASK_TAG, "Read %d bytes: '%s'", rxBytes, data);
 			ssd1306_clear_screen(ssd1306_dev, 0x00);
-			ssd1306_draw_string(ssd1306_dev, 2, 2, (const uint8_t*)display_text_1, 12, 1);
-			ssd1306_draw_string(ssd1306_dev, 2, 14, (const uint8_t*)display_text_2, 12, 1);
-			ssd1306_draw_string(ssd1306_dev, 2, 26, (const uint8_t*)display_text_3, 12, 1);
-			ssd1306_draw_string(ssd1306_dev, 2, 38, (const uint8_t*)display_text_4, 12, 1);
-			ssd1306_draw_string(ssd1306_dev, 2, 50, (const uint8_t*)display_text_5, 12, 1);
+			ssd1306_draw_string(ssd1306_dev, 2, 2, (uint8_t*)display_text_1, 12, 1);
+			ssd1306_draw_string(ssd1306_dev, 2, 14, (uint8_t*)display_text_2, 12, 1);
+			ssd1306_draw_string(ssd1306_dev, 2, 26, (uint8_t*)display_text_3, 12, 1);
+			ssd1306_draw_string(ssd1306_dev, 2, 38, (uint8_t*)display_text_4, 12, 1);
+			ssd1306_draw_string(ssd1306_dev, 2, 50, (uint8_t*)display_text_5, 12, 1);
 			ssd1306_refresh_gram(ssd1306_dev);
 			//vTaskDelay(pdMS_TO_TICKS(50));
 		}

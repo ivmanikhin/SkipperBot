@@ -106,10 +106,10 @@ static void rx_task(void *arg)
 	static float height;
 	static float direction;
 	static float speed;
-	static char lat_degs[2];
-	static char lat_mins[8];
-	static char long_degs[3];
-	static char long_mins[8];
+	static char lat_degs[3];
+	static char lat_mins[9];
+	static char long_degs[4];
+	static char long_mins[9];
 
 	uint8_t* data = (uint8_t*) heap_caps_malloc(RX_BUF_SIZE+1, MALLOC_CAP_8BIT);
 	char** gpgga = (char**) heap_caps_malloc(sizeof(char*) * 16, MALLOC_CAP_8BIT);

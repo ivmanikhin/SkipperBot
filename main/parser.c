@@ -2,17 +2,17 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <esp_heap_caps.h>
 
 
-char* concat(const char *s1, const char *s2)
+void concat(char* result, const char *s1, const char *s2)
 {
     const size_t len1 = strlen(s1);
     const size_t len2 = strlen(s2);
-    char *result = malloc(len1 + len2 + 1); // +1 for the null-terminator
-    // in real code you would check for errors in malloc here
+    //char *result = heap_caps_malloc(len1 + len2 + 1, MALLOC_CAP_8BIT); // +1 for the null-terminator
+    // in real code you would check for errors in heap_caps_malloc here
     memcpy(result, s1, len1);
     memcpy(result + len1, s2, len2 + 1); // +1 to copy the null-terminator
-    return result;
 }
 
 
@@ -29,8 +29,10 @@ void get_substring(const char* string, char* substr, const int pos, const int le
 
 
 
-char** split_by_2_separators(const char* input, const char* separator_1, const char* separator_2, int sent_num, int max_sen_len)
+void split_by_2_separators(char** sentences, const char* input, const char* separator_1, const char* separator_2, int sent_num, int max_sen_len)
 {
+    const int sizeof_char = sizeof(char);
+    // const int sizeof_addr = sizeof(char*);
     int sentence = 0;
     if (max_sen_len == 0)
 	{
@@ -42,17 +44,18 @@ char** split_by_2_separators(const char* input, const char* separator_1, const c
     }
     const int sep_1_len = strlen(separator_1);
     const int sep_2_len = strlen(separator_2);
-    char temp_substr_1[sep_1_len];
-    char temp_substr_2[sep_2_len];
+    char* temp_substr_1 = (char*)heap_caps_malloc(sizeof_char * (sep_1_len+1), MALLOC_CAP_8BIT);
+    char* temp_substr_2 = (char*)heap_caps_malloc(sizeof_char * (sep_2_len+1), MALLOC_CAP_8BIT);
     char cur_char = '1';
     int i = 0;
-    char* temp_sentence = (char*)malloc(sizeof(char) * (max_sen_len+1));
+
+    //char* temp_sentence = (char*)heap_caps_malloc(sizeof_char * (max_sen_len+1), MALLOC_CAP_8BIT);
     // char sentences[sent_num][max_sen_len];
-    char** sentences = (char**)malloc(sizeof(char*) * sent_num);
-    for (int i = 0; i < sent_num; i++)
-    {
-        sentences[i] = (char*)malloc(sizeof(char) * (max_sen_len+1));
-    }
+    // char** sentences = (char**)heap_caps_malloc(sizeof_addr * sent_num, MALLOC_CAP_8BIT);
+    // for (int i = 0; i < sent_num; i++)
+    // {
+    //     sentences[i] = (char*)heap_caps_malloc(sizeof_char * (max_sen_len+1), MALLOC_CAP_8BIT);
+    // }
     int sentence_i = 0;
     int j = 0;
     while (cur_char!='\0' && sentence_i < sent_num)
@@ -63,33 +66,37 @@ char** split_by_2_separators(const char* input, const char* separator_1, const c
         if (!strcmp(temp_substr_1, separator_1) && sentence == 0)
         {
             sentence = 1;
+            // sentences[sentence_i] = (char*)heap_caps_malloc(sizeof_char * (max_sen_len+1), MALLOC_CAP_8BIT);
+            j = 0;
         }
         else if ((!strcmp(temp_substr_2, separator_2) && sentence == 1))
         {
             sentence = 0;
-            temp_sentence[j] = '\0';
-            printf("    Temp sentence: %s\n", temp_sentence);
-            strncpy (sentences[sentence_i], temp_sentence, strlen(temp_sentence));
+            sentences[sentence_i][j] = '\0';
+            // printf("    Temp sentence: %s\n    Sent num %i\n    Sent %i\n", temp_sentence, sent_num, sentence_i);
+            //printf("    Temp sentence: %s\n    Temp sen len: %i\n    Sent num %i\n    Sent %i size %i\n", temp_sentence, strlen(temp_sentence), sent_num, sentence_i, sizeof(sentences[sentence_i]));
+            //strcpy (sentences[sentence_i], temp_sentence);
             sentence_i++;
-            temp_sentence[0] = '\0';
-            j = 0;
+            // temp_sentence[0] = '\0';
         }
         if (sentence == 1)
         {
-            printf("   j: %i   cur_char: %c    Sent status: %i\n", j, cur_char, sentence);
-            temp_sentence[j] = cur_char;
-            temp_sentence[j+1] = '\0';
+            sentences[sentence_i][j] = cur_char;
+            // temp_sentence[j+1] = '\0';
             j++;
         }
         i++;
     }
-    return sentences;
+    free(temp_substr_1);
+    free(temp_substr_2);
+    //free(temp_sentence);
+
 }
 
 
 
 
-char** split_to_sentences(const char* input, const char* separator, int sent_num, int max_sen_len)
+void split_to_sentences(char** sentences, const char* input, const char* separator, int sent_num, int max_sen_len)
 {
     if (max_sen_len == 0)
 	{
@@ -99,19 +106,22 @@ char** split_to_sentences(const char* input, const char* separator, int sent_num
     {
     	sent_num = 16;
     }
+    const int sizeof_char = sizeof(char);
+    //const int sizeof_addr = sizeof(char*);
 //    int inp_len = strlen(input);
     const int sep_len = strlen(separator);
-    char temp_substr[sep_len];
+
+    char* temp_substr = (char*)heap_caps_malloc(sizeof_char * (sep_len + 1), MALLOC_CAP_8BIT);
     char cur_char = '1';
     int i = 0;
-    char* temp_sentence = (char*)malloc(sizeof(char) * (max_sen_len + 1));
+    //char* temp_sentence = (char*)heap_caps_malloc(sizeof_char * (max_sen_len + 1), MALLOC_CAP_8BIT);
     // strcpy(temp_sentence, "");
-    char** sentences = (char**)malloc(sizeof(char*) * (sent_num));
-    for (int i = 0; i < sent_num; i++)
-    {
-        sentences[i] = (char*)malloc(sizeof(char) * (max_sen_len + 1));
-        // strcpy(sentences[i], "");
-    }
+ //   char** sentences = (char**)heap_caps_malloc(sizeof_addr * (sent_num), MALLOC_CAP_8BIT);
+    // for (int i = 0; i < sent_num; i++)
+    // {
+    //     sentences[i] = (char*)heap_caps_malloc(sizeof_char * (max_sen_len + 1), MALLOC_CAP_8BIT);
+    //     // strcpy(sentences[i], "");
+    // }
     int sentence_i = 0;
     int j = 0;
     cur_char = '1';
@@ -119,24 +129,24 @@ char** split_to_sentences(const char* input, const char* separator, int sent_num
     {
         get_substring(input, temp_substr, i+1, sep_len);
         cur_char = *(input+i);
-        temp_sentence[j] = cur_char;
-        temp_sentence[j+1] = '\0';
+        sentences[sentence_i][j] = cur_char;
         j++;
-        if (strlen(temp_sentence)>0)
+        if (strlen(sentences[sentence_i])>0)
         {
             if (!strcmp(temp_substr, separator) || cur_char == '\0')
             {
-                temp_sentence[j] = '\0';
-                i--;
-                memmove(temp_sentence, temp_sentence+sep_len, strlen(temp_sentence));
-                strncpy(sentences[sentence_i], temp_sentence, strlen(temp_sentence));
+                sentences[sentence_i][j] = '\0';
+                // i--;
+                // printf("Free heap size: %i\n", heap_caps_get_free_size(MALLOC_CAP_DEFAULT));
+                memmove(sentences[sentence_i], sentences[sentence_i]+sep_len, strlen(sentences[sentence_i]));
                 sentence_i++;
-                strcpy(temp_sentence, "");
+ //               sentences[sentence_i] = (char*)heap_caps_malloc(sizeof_char * (max_sen_len + 1), MALLOC_CAP_8BIT);
                 // temp_sentence[0] = '\0';
-                j = -1;
+                j = 0;
             }
         }
         i++;
     }
-    return sentences;
+    free(temp_substr);
+//    return sentences;
 }

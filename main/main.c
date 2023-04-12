@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "parser.c"
+#include <esp_heap_caps.h>
 
 
 
@@ -84,7 +85,7 @@ void setup()
 static void rx_task(void *arg)
 {
 
-	uint8_t* data = (uint8_t*) malloc (RX_BUF_SIZE+1);
+
 	// static char** gpgga = (char**)malloc(sizeof(char*));
 	// gpgga[0] = (char*)malloc(sizeof(char)*129);
 	// static char** gpvtg = (char**)malloc(sizeof(char*));
@@ -96,62 +97,89 @@ static void rx_task(void *arg)
 	static char display_text_3[64];
 	static char display_text_4[64];
 	static char display_text_5[64];
+	static float latitude;
+	static char lat_direction;
+	static float longitude;
+	static char long_direction;
+	static float time;
+	static int satellites_num;
+	static float height;
+	static float direction;
+	static float speed;
+	static char lat_degs[2];
+	static char lat_mins[8];
+	static char long_degs[3];
+	static char long_mins[8];
+
+	uint8_t* data = (uint8_t*) heap_caps_malloc(RX_BUF_SIZE+1, MALLOC_CAP_8BIT);
+	char** gpgga = (char**) heap_caps_malloc(sizeof(char*) * 16, MALLOC_CAP_8BIT);
+	for (int i=0; i<16; i++)
+	{
+		gpgga[i] = (char*) heap_caps_malloc(sizeof(char) * 129, MALLOC_CAP_8BIT);
+	}
+	char** gpvtg = (char**) heap_caps_malloc(sizeof(char*) * 16, MALLOC_CAP_8BIT);
+	for (int i=0; i<16; i++)
+	{
+		gpvtg[i] = (char*) heap_caps_malloc(sizeof(char) * 129, MALLOC_CAP_8BIT);
+	}
+	char** raw_coords = (char**) heap_caps_malloc(sizeof(char*) * 16, MALLOC_CAP_8BIT);
+	for (int i=0; i<16; i++)
+	{
+		raw_coords[i] = (char*) heap_caps_malloc(sizeof(char) * 129, MALLOC_CAP_8BIT);
+	}
+	char** raw_speed = (char**) heap_caps_malloc(sizeof(char*) * 16, MALLOC_CAP_8BIT);
+	for (int i=0; i<16; i++)
+	{
+		raw_speed[i] = (char*) heap_caps_malloc(sizeof(char) * 129, MALLOC_CAP_8BIT);
+	}
 	while (1)
 	{
+
 		const int rxBytes = uart_read_bytes(UART, data, RX_BUF_SIZE, pdMS_TO_TICKS(200));
 		if (rxBytes > 0)
 		{
-			data[rxBytes] = '\0';
+			data[rxBytes] = '\0'; 
 			//int coords_num = 0;
 			printf("%s\n\n", data);
 
-			char** gpgga = split_by_2_separators((char*)data, "$GPGGA", "*", 0, 0);
-			char** gpvtg = split_by_2_separators((char*)data, "$GPVTG", "*", 0, 0);
+			split_by_2_separators(gpgga, (char*)data, "$GPGGA", "*", 0, 0);
+			split_by_2_separators(gpvtg, (char*)data, "$GPVTG", "*", 0, 0);
 
 
 			//split_by_2_separators(gpgga, (char*)data, "$GNGGA", "*", 0);
 
 
-			char** raw_coords = split_to_sentences(gpgga[0], ",", 0, 0);
-			char** raw_speed = split_to_sentences(gpvtg[0], ",", 0, 0);
-		    // for (int i = 0; i < 10; i++)
-		    // {
-		    //     memmove(raw_coords[i], raw_coords[i]+1, strlen(raw_coords[i]));
-		    // }
-			// for (int i = 0; i < 10; i++)
-		    // {
-		    //     memmove(raw_speed[i], raw_speed[i]+1, strlen(raw_speed[i]));
-		    // }
+			split_to_sentences(raw_coords, gpgga[0], ",", 0, 0);
+			split_to_sentences(raw_speed, gpvtg[0], ",", 0, 0);
 
 					    //get_substring((char*) data, display_text_1, 0, 70);
 
-			// char lat_degs[2];
-			// char lat_mins[7];
-			// get_substring(raw_coords[2], lat_degs, 0, 2);
-			// get_substring(raw_coords[2], lat_mins, 2, 7);
+			//printf("Free heap size: %i\n", heap_caps_get_free_size(MALLOC_CAP_DEFAULT));
+			get_substring(raw_coords[2], lat_degs, 0, 2);
+			get_substring(raw_coords[2], lat_mins, 2, 8);
+			get_substring(raw_coords[4], long_degs, 0, 3);
+			get_substring(raw_coords[4], long_mins, 3, 8);
+			
+			printf("Coords: %s : %s + %s\n", raw_coords[2], lat_degs, lat_mins);
 
-			// char long_degs[3];
-			// char long_mins[7];
-			// get_substring(raw_coords[4], long_degs, 0, 3);
-			// get_substring(raw_coords[4], long_mins, 3, 7);
-
-			// float latitude = (float) atoll(lat_degs) + (float) atoll(lat_mins)*0.166667;
-			// char lat_direction = raw_coords[3][0];
-			// float longitude = (float) atoll(long_degs) + (float) atoll(long_mins)*0.166667;
-			// char long_direction = raw_coords[5][0];
-
-			float latitude = (float) atoll(raw_coords[2]);
-			char lat_direction = raw_coords[3][0];
-			float longitude = (float) atoll(raw_coords[4]);
-			char long_direction = raw_coords[5][0];
+			latitude = (float) atoll(lat_degs) + (float) atoll(lat_mins)*0.0166667;
+			lat_direction = raw_coords[3][0];
+			longitude = (float) atoll(long_degs) + (float) atoll(long_mins)*0.0166667;
+			long_direction = raw_coords[5][0];
 
 
-			float time = (float) atoll(raw_coords[1]);
-			int satellites_num = (int) atoi(raw_coords[7]);
-			float height = (float)atoll(raw_coords[9]);
-			float direction = (float)atoll(raw_speed[1]);
-			float speed = (float)atoll(raw_speed[7]);
-			snprintf(display_text_1, sizeof(display_text_1), "%.2f.%c  %.2f.%c", latitude, lat_direction, longitude, long_direction);
+			// latitude = (float)atoll(raw_coords[2]);
+			// lat_direction = raw_coords[3][0];
+			// longitude = (float)atoll(raw_coords[4]);
+			// long_direction = raw_coords[5][0];
+			time = (float)atoll(raw_coords[1]);
+			satellites_num = (int)atoi(raw_coords[7]);
+			height = (float)atoll(raw_coords[9]);
+			direction = (float)atoll(raw_speed[1]);
+			speed = (float)atoll(raw_speed[7]);
+
+
+			snprintf(display_text_1, sizeof(display_text_1), "%.4f.%c  %.4f.%c", latitude, lat_direction, longitude, long_direction);
 			snprintf(display_text_2, sizeof(display_text_2), "Time: %.2f", time);
 			snprintf(display_text_3, sizeof(display_text_3), "%i satellites", satellites_num);
 			snprintf(display_text_4, sizeof(display_text_4), "Height:%.1f", height);
@@ -172,8 +200,14 @@ static void rx_task(void *arg)
 			ssd1306_draw_string(ssd1306_dev, 2, 50, (uint8_t*)display_text_5, 12, 1);
 			ssd1306_refresh_gram(ssd1306_dev);
 			//vTaskDelay(pdMS_TO_TICKS(50));
+
+			
 		}
 	}
+	free(gpgga);
+	free(gpvtg);
+	free(raw_coords);
+	free(raw_speed);
 	free(data);
 }
 

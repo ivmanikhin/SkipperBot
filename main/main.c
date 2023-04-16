@@ -97,19 +97,19 @@ static void rx_task(void *arg)
 	static char display_text_3[64];
 	static char display_text_4[64];
 	static char display_text_5[64];
-	static float latitude;
+	static double latitude;
 	static char lat_direction;
-	static float longitude;
+	static double longitude;
 	static char long_direction;
 	static float time;
 	static int satellites_num;
 	static float height;
 	static float direction;
 	static float speed;
-	static char lat_degs[2];
-	static char lat_mins[8];
-	static char long_degs[3];
-	static char long_mins[8];
+	static char lat_degs[3];
+	static char lat_mins[9];
+	static char long_degs[4];
+	static char long_mins[9];
 
 	uint8_t* data = (uint8_t*) heap_caps_malloc(RX_BUF_SIZE+1, MALLOC_CAP_8BIT);
 	char** gpgga = (char**) heap_caps_malloc(sizeof(char*) * 16, MALLOC_CAP_8BIT);
@@ -160,11 +160,13 @@ static void rx_task(void *arg)
 			get_substring(raw_coords[4], long_degs, 0, 3);
 			get_substring(raw_coords[4], long_mins, 3, 8);
 			
-			printf("Coords: %s : %s + %s\n", raw_coords[2], lat_degs, lat_mins);
+			// printf("Coords: %s : ", raw_coords[2]);
 
-			latitude = (float) atoll(lat_degs) + (float) atoll(lat_mins)*0.0166667;
+			latitude = (float) atof(lat_degs) + (float) atof(lat_mins)*0.016666667;
 			lat_direction = raw_coords[3][0];
-			longitude = (float) atoll(long_degs) + (float) atoll(long_mins)*0.0166667;
+			// printf("%f %f\n", (float)atof(lat_degs), (float) atof(lat_mins));
+			longitude = (float) atof(long_degs) + (float) atof(long_mins)*0.016666667;
+			// printf("%f\n", longitude);
 			long_direction = raw_coords[5][0];
 
 
@@ -172,14 +174,14 @@ static void rx_task(void *arg)
 			// lat_direction = raw_coords[3][0];
 			// longitude = (float)atoll(raw_coords[4]);
 			// long_direction = raw_coords[5][0];
-			time = (float)atoll(raw_coords[1]);
+			time = (float)atof(raw_coords[1]);
 			satellites_num = (int)atoi(raw_coords[7]);
-			height = (float)atoll(raw_coords[9]);
-			direction = (float)atoll(raw_speed[1]);
-			speed = (float)atoll(raw_speed[7]);
+			height = (float)atof(raw_coords[9]);
+			direction = (float)atof(raw_speed[1]);
+			speed = (float)atof(raw_speed[7]);
 
 
-			snprintf(display_text_1, sizeof(display_text_1), "%.4f.%c  %.4f.%c", latitude, lat_direction, longitude, long_direction);
+			snprintf(display_text_1, sizeof(display_text_1), "%.5f%c  %.5f%c", latitude, lat_direction, longitude, long_direction);
 			snprintf(display_text_2, sizeof(display_text_2), "Time: %.2f", time);
 			snprintf(display_text_3, sizeof(display_text_3), "%i satellites", satellites_num);
 			snprintf(display_text_4, sizeof(display_text_4), "Height:%.1f", height);

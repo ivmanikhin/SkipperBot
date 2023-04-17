@@ -40,28 +40,21 @@ static const int RX_BUF_SIZE = 1024;
 
 void setup()
 {
-//	esp_rom_gpio_pad_select_gpio(USONIC_TRIGGER);
-//	gpio_set_direction(USONIC_TRIGGER, GPIO_MODE_OUTPUT);
-//	esp_rom_gpio_pad_select_gpio(USONIC_ECHO);
-//	gpio_set_direction(USONIC_ECHO, GPIO_MODE_INPUT);
-//	gpio_install_isr_service(0);
 
 // setup i2c display:
-    i2c_config_t conf;
-    conf.mode = I2C_MODE_MASTER;
-    conf.sda_io_num = (gpio_num_t)I2C_MASTER_SDA_IO;
-    conf.sda_pullup_en = GPIO_PULLUP_ENABLE;
-    conf.scl_io_num = (gpio_num_t)I2C_MASTER_SCL_IO;
-    conf.scl_pullup_en = GPIO_PULLUP_ENABLE;
-    conf.master.clk_speed = I2C_MASTER_FREQ_HZ;
-    conf.clk_flags = I2C_SCLK_SRC_FLAG_FOR_NOMAL;
-    i2c_param_config(I2C_MASTER_NUM, &conf);
-    i2c_driver_install(I2C_MASTER_NUM, conf.mode, 0, 0, 0);
+    i2c_config_t display_conf;
+    display_conf.mode = I2C_MODE_MASTER;
+    display_conf.sda_io_num = (gpio_num_t)I2C_MASTER_SDA_IO;
+    display_conf.sda_pullup_en = GPIO_PULLUP_ENABLE;
+    display_conf.scl_io_num = (gpio_num_t)I2C_MASTER_SCL_IO;
+    display_conf.scl_pullup_en = GPIO_PULLUP_ENABLE;
+    display_conf.master.clk_speed = I2C_MASTER_FREQ_HZ;
+    display_conf.clk_flags = I2C_SCLK_SRC_FLAG_FOR_NOMAL;
+    i2c_param_config(I2C_MASTER_NUM, &display_conf);
+    i2c_driver_install(I2C_MASTER_NUM, display_conf.mode, 0, 0, 0);
     ssd1306_dev = ssd1306_create(I2C_MASTER_NUM, SSD1306_I2C_ADDRESS);
 
-//  const int UART = UART_2;
-
-// setup UART:
+// setup GPS module NEO-6M
     const uart_config_t uart_config = {
         .baud_rate = 9600,
         .data_bits = UART_DATA_8_BITS,
@@ -69,14 +62,11 @@ void setup()
         .stop_bits = UART_STOP_BITS_1,
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
 		.source_clk = UART_SCLK_DEFAULT,
-//        .rx_flow_ctrl_thresh = 122,
     };
-
     uart_driver_install(UART, RX_BUF_SIZE*2, 0, 20, NULL, 0);
     uart_param_config(UART, &uart_config);
     uart_set_pin(UART, TXD_PIN, RXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
     uart_enable_pattern_det_baud_intr(UART, 0x0a, 1, 9, 0, 0);
-//    uart_pattern_queue_reset(UART, 1, 20);
 };
 
 
@@ -85,18 +75,11 @@ void setup()
 static void rx_task(void *arg)
 {
 
-
-	// static char** gpgga = (char**)malloc(sizeof(char*));
-	// gpgga[0] = (char*)malloc(sizeof(char)*129);
-	// static char** gpvtg = (char**)malloc(sizeof(char*));
-	// gpvtg[0] = (char*)malloc(sizeof(char)*129);
-	//static const char *RX_TASK_TAG = "RX_TASK";
-	//esp_log_level_set(RX_TASK_TAG, ESP_LOG_INFO);
-	static char display_text_1[64];
-	static char display_text_2[64];
-	static char display_text_3[64];
-	static char display_text_4[64];
-	static char display_text_5[64];
+	static char display_text_1[32];
+	static char display_text_2[32];
+	static char display_text_3[32];
+	static char display_text_4[32];
+	static char display_text_5[32];
 	static double latitude;
 	static char lat_direction;
 	static double longitude;
@@ -139,47 +122,28 @@ static void rx_task(void *arg)
 		if (rxBytes > 0)
 		{
 			data[rxBytes] = '\0'; 
-			//int coords_num = 0;
-			printf("%s\n\n", data);
 
 			split_by_2_separators(gpgga, (char*)data, "$GPGGA", "*", 0, 0);
 			split_by_2_separators(gpvtg, (char*)data, "$GPVTG", "*", 0, 0);
 
-
-			//split_by_2_separators(gpgga, (char*)data, "$GNGGA", "*", 0);
-
-
 			split_to_sentences(raw_coords, gpgga[0], ",", 0, 0);
 			split_to_sentences(raw_speed, gpvtg[0], ",", 0, 0);
 
-					    //get_substring((char*) data, display_text_1, 0, 70);
-
-			//printf("Free heap size: %i\n", heap_caps_get_free_size(MALLOC_CAP_DEFAULT));
 			get_substring(raw_coords[2], lat_degs, 0, 2);
 			get_substring(raw_coords[2], lat_mins, 2, 8);
 			get_substring(raw_coords[4], long_degs, 0, 3);
 			get_substring(raw_coords[4], long_mins, 3, 8);
 			
-			// printf("Coords: %s : ", raw_coords[2]);
-
 			latitude = (float) atof(lat_degs) + (float) atof(lat_mins)*0.016666667;
 			lat_direction = raw_coords[3][0];
-			// printf("%f %f\n", (float)atof(lat_degs), (float) atof(lat_mins));
 			longitude = (float) atof(long_degs) + (float) atof(long_mins)*0.016666667;
-			// printf("%f\n", longitude);
 			long_direction = raw_coords[5][0];
 
-
-			// latitude = (float)atoll(raw_coords[2]);
-			// lat_direction = raw_coords[3][0];
-			// longitude = (float)atoll(raw_coords[4]);
-			// long_direction = raw_coords[5][0];
 			time = (float)atof(raw_coords[1]);
 			satellites_num = (int)atoi(raw_coords[7]);
 			height = (float)atof(raw_coords[9]);
 			direction = (float)atof(raw_speed[1]);
 			speed = (float)atof(raw_speed[7]);
-
 
 			snprintf(display_text_1, sizeof(display_text_1), "%.5f%c  %.5f%c", latitude, lat_direction, longitude, long_direction);
 			snprintf(display_text_2, sizeof(display_text_2), "Time: %.2f", time);
@@ -187,13 +151,6 @@ static void rx_task(void *arg)
 			snprintf(display_text_4, sizeof(display_text_4), "Height:%.1f", height);
 			snprintf(display_text_5, sizeof(display_text_5), "Dir: %.1f Spd: %.1f", direction, speed);
 
-//		    else
-//		    {
-//		    	strcpy(display_text, "Processing...");
-//		    }
-
-
-			//ESP_LOGI(RX_TASK_TAG, "Read %d bytes: '%s'", rxBytes, data);
 			ssd1306_clear_screen(ssd1306_dev, 0x00);
 			ssd1306_draw_string(ssd1306_dev, 2, 2, (uint8_t*)display_text_1, 12, 1);
 			ssd1306_draw_string(ssd1306_dev, 2, 14, (uint8_t*)display_text_2, 12, 1);
@@ -201,9 +158,7 @@ static void rx_task(void *arg)
 			ssd1306_draw_string(ssd1306_dev, 2, 38, (uint8_t*)display_text_4, 12, 1);
 			ssd1306_draw_string(ssd1306_dev, 2, 50, (uint8_t*)display_text_5, 12, 1);
 			ssd1306_refresh_gram(ssd1306_dev);
-			//vTaskDelay(pdMS_TO_TICKS(50));
-
-			
+		
 		}
 	}
 	free(gpgga);
@@ -219,22 +174,7 @@ static void rx_task(void *arg)
 void app_main(void)
 {
 	setup();
-//	vTaskDelay(pdMS_TO_TICKS(3000));
 
-    ssd1306_refresh_gram(ssd1306_dev);
-//    sprintf(data_str_1, "Distance:");
-//    int i;
     xTaskCreate(rx_task, "uart_rx_task", 1024 * 2, NULL, configMAX_PRIORITIES, NULL);
-//    while(1)
-//    {
-////    	cm = 0;
-////    	for (i=0; i<10; i++)
-////    	{
-////    		cm = mesure_distance();
-////    		vTaskDelay(50 / portTICK_PERIOD_MS);
-////    	}
-////    	uart_read
-////    	cm =  0.1 * cm;
-////        sprintf(data_str_2, "%0.02f cm", cm);
-//    }
+
 }

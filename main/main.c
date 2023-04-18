@@ -8,35 +8,37 @@
 #include <string.h>
 #include "parser.c"
 #include <esp_heap_caps.h>
+#include "i2c_bus/include/i2cdev.h"
+#include "i2c_bus/include/i2c_drv.h"
 
 
-
-
-
-// define I2C display variables:
-#define I2C_MASTER_SCL_IO 22        /*!< gpio number for I2C master clock */
-#define I2C_MASTER_SDA_IO 21        /*!< gpio number for I2C master data  */
-#define I2C_MASTER_NUM I2C_NUM_0    /*!< I2C port number for master dev */
-#define I2C_MASTER_FREQ_HZ 200000   /*!< I2C master clock frequency */
-#define I2C_HOST  0
+// define I2C display consts:
+#define I2C_DISPLAY_SCL_IO 22        /*!< gpio number for I2C master clock */
+#define I2C_DISPLAY_SDA_IO 21        /*!< gpio number for I2C master data  */
+#define I2C_DISPLAY_NUM I2C_NUM_0    /*!< I2C port number for master dev */
+#define I2C_DISPLAY_FREQ_HZ 200000   /*!< I2C master clock frequency */
 static ssd1306_handle_t ssd1306_dev = NULL;
 
-//char data_str_2[16] = {0};
-
-
-
+// define GPS module consts:
 #define TXD_PIN (GPIO_NUM_17)
 #define RXD_PIN (GPIO_NUM_16)
 #define UART UART_NUM_2
 static const int RX_BUF_SIZE = 1024;
-//#define USONIC_TRIGGER 5
-//#define USONIC_ECHO 18
-//#define SOUND_SPEED 0.0343
-//double cm;
-//int16_t start_time, stop_time, duration;
 
+// define compass consts:
 
-
+#define I2C_COMPASS_SCL_IO 19        /*!< gpio number for I2C master clock */
+#define I2C_COMPASS_SDA_IO 18        /*!< gpio number for I2C master data  */
+#define I2C_COMPASS_NUM I2C_NUM_1    /*!< I2C port number for master dev */
+#define I2C_COMPASS_FREQ_HZ 200000   /*!< I2C master clock frequency */
+static const I2cDef hmc5883l_port =
+{
+		.i2cPort            = I2C_NUM_1,
+		.i2cClockSpeed      = 400000,
+		.gpioSCLPin         = 19,
+		.gpioSDAPin         = 18,
+		.gpioPullup         = GPIO_PULLUP_ENABLE,
+};
 
 void setup()
 {
@@ -44,15 +46,15 @@ void setup()
 // setup i2c display:
     i2c_config_t display_conf;
     display_conf.mode = I2C_MODE_MASTER;
-    display_conf.sda_io_num = (gpio_num_t)I2C_MASTER_SDA_IO;
+    display_conf.sda_io_num = (gpio_num_t)I2C_DISPLAY_SDA_IO;
     display_conf.sda_pullup_en = GPIO_PULLUP_ENABLE;
-    display_conf.scl_io_num = (gpio_num_t)I2C_MASTER_SCL_IO;
+    display_conf.scl_io_num = (gpio_num_t)I2C_DISPLAY_SCL_IO;
     display_conf.scl_pullup_en = GPIO_PULLUP_ENABLE;
-    display_conf.master.clk_speed = I2C_MASTER_FREQ_HZ;
+    display_conf.master.clk_speed = I2C_DISPLAY_FREQ_HZ;
     display_conf.clk_flags = I2C_SCLK_SRC_FLAG_FOR_NOMAL;
-    i2c_param_config(I2C_MASTER_NUM, &display_conf);
-    i2c_driver_install(I2C_MASTER_NUM, display_conf.mode, 0, 0, 0);
-    ssd1306_dev = ssd1306_create(I2C_MASTER_NUM, SSD1306_I2C_ADDRESS);
+    i2c_param_config(I2C_DISPLAY_NUM, &display_conf);
+    i2c_driver_install(I2C_DISPLAY_NUM, display_conf.mode, 0, 0, 0);
+    ssd1306_dev = ssd1306_create(I2C_DISPLAY_NUM, SSD1306_I2C_ADDRESS);
 
 // setup GPS module NEO-6M
     const uart_config_t uart_config = {
@@ -67,6 +69,10 @@ void setup()
     uart_param_config(UART, &uart_config);
     uart_set_pin(UART, TXD_PIN, RXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
     uart_enable_pattern_det_baud_intr(UART, 0x0a, 1, 9, 0, 0);
+
+// setup hmc5883l Compass:
+	hmc5883l_init(hmc5883l_port);
+
 };
 
 

@@ -8,8 +8,7 @@
 #include <string.h>
 #include "parser.c"
 #include <esp_heap_caps.h>
-#include "hmc5883l/driver_hmc5883l_basic.h"
-#include "hmc5883l/driver_hmc5883l.c"
+#include <hmc5883l.h>
 
 
 
@@ -23,8 +22,7 @@ static ssd1306_handle_t ssd1306_dev = NULL;
 #define I2C_COMPASS_SDA_IO 18        /*!< gpio number for I2C master data  */
 #define I2C_COMPASS_NUM I2C_NUM_1    /*!< I2C port number for master dev */
 #define I2C_COMPASS_FREQ_HZ 400000   /*!< I2C master clock frequency */
-static hmc5883l_handle_t hmc5883l_dev;
-
+hmc5883l_dev_t compass;
 // define GPS module consts:
 #define TXD_PIN (GPIO_NUM_17)
 #define RXD_PIN (GPIO_NUM_16)
@@ -37,6 +35,7 @@ static const int RX_BUF_SIZE = 1024;
 
 void setup()
 {
+	i2cdev_init();
 
 // setup i2c display:
     i2c_config_t display_conf;
@@ -66,18 +65,24 @@ void setup()
     uart_enable_pattern_det_baud_intr(UART, 0x0a, 1, 9, 0, 0);
 
 // setup i2c compass:
-    i2c_config_t compass_conf;
-    compass_conf.mode = I2C_MODE_MASTER;
-    compass_conf.sda_io_num = (gpio_num_t)I2C_COMPASS_SDA_IO;
-    compass_conf.sda_pullup_en = GPIO_PULLUP_ENABLE;
-    compass_conf.scl_io_num = (gpio_num_t)I2C_COMPASS_SCL_IO;
-    compass_conf.scl_pullup_en = GPIO_PULLUP_ENABLE;
-    compass_conf.master.clk_speed = I2C_COMPASS_FREQ_HZ;
-    compass_conf.clk_flags = I2C_SCLK_SRC_FLAG_FOR_NOMAL;
-    i2c_param_config(I2C_COMPASS_NUM, &compass_conf);
-    i2c_driver_install(I2C_COMPASS_NUM, compass_conf.mode, 0, 0, 0);
-    hmc5883l_init(&hmc5883l_dev);
-	hmc5883l_set_average_sample(&hmc5883l_dev, HMC5883L_BASIC_DEFAULT_AVERAGE_SAMPLE);
+    // i2c_config_t compass_conf;
+    // compass_conf.mode = I2C_MODE_MASTER;
+    // compass_conf.sda_io_num = (gpio_num_t)I2C_COMPASS_SDA_IO;
+    // compass_conf.sda_pullup_en = GPIO_PULLUP_ENABLE;
+    // compass_conf.scl_io_num = (gpio_num_t)I2C_COMPASS_SCL_IO;
+    // compass_conf.scl_pullup_en = GPIO_PULLUP_ENABLE;
+    // compass_conf.master.clk_speed = I2C_COMPASS_FREQ_HZ;
+    // compass_conf.clk_flags = I2C_SCLK_SRC_FLAG_FOR_NOMAL;
+    // i2c_param_config(I2C_COMPASS_NUM, &compass_conf);
+    // i2c_driver_install(I2C_COMPASS_NUM, compass_conf.mode, 0, 0, 0);
+	
+	memset(&compass, 0, sizeof(hmc5883l_dev_t));
+	hmc5883l_init_desc(&compass, I2C_COMPASS_NUM, I2C_COMPASS_SDA_IO, I2C_COMPASS_SCL_IO);
+	hmc5883l_init(&compass);
+	hmc5883l_set_opmode(&compass, HMC5883L_MODE_CONTINUOUS);
+	hmc5883l_set_samples_averaged(&compass, HMC5883L_SAMPLES_8);
+	hmc5883l_set_data_rate(&compass, HMC5883L_DATA_RATE_07_50);
+	hmc5883l_set_gain(&compass, HMC5883L_GAIN_1090);
 
 };
 
@@ -86,8 +91,7 @@ void setup()
 
 static void rx_task(void *arg)
 {
-	static int16_t raw_compass_data[3];
-	static float gauss_compass_data[3];
+	static hmc5883l_data_t compass_data;
 	static char display_text_1[32];
 	static char display_text_2[32];
 	static char display_text_3[32];
@@ -130,8 +134,9 @@ static void rx_task(void *arg)
 	}
 	while (1)
 	{
-		hmc5883l_single_read(&hmc5883l_dev, raw_compass_data, gauss_compass_data);
-		printf("compass data: %.2f, %.2f, %.2f\n", gauss_compass_data[0], gauss_compass_data[1], gauss_compass_data[2]);
+		
+		hmc5883l_get_data(&compass, &compass_data);
+		printf("compass data: %.2f, %.2f, %.2f\n", compass_data.x, compass_data.y, compass_data.z);
 		const int rxBytes = uart_read_bytes(UART, data, RX_BUF_SIZE, pdMS_TO_TICKS(200));
 		if (rxBytes > 0)
 		{
@@ -162,7 +167,7 @@ static void rx_task(void *arg)
 			snprintf(display_text_1, sizeof(display_text_1), "%.5f%c  %.5f%c", latitude, lat_direction, longitude, long_direction);
 			snprintf(display_text_2, sizeof(display_text_2), "Time: %.2f", time);
 			snprintf(display_text_3, sizeof(display_text_3), "%i satellites", satellites_num);
-			snprintf(display_text_4, sizeof(display_text_4), "Compass:%.1f", height);
+			snprintf(display_text_4, sizeof(display_text_4), "compass data: %.2f, %.2f, %.2f\n", compass_data.x, compass_data.y, compass_data.z);
 			snprintf(display_text_5, sizeof(display_text_5), "Dir: %.1f Spd: %.1f", direction, speed);
 
 			ssd1306_clear_screen(ssd1306_dev, 0x00);

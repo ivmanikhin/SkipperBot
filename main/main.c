@@ -8,21 +8,21 @@
 #include <string.h>
 #include "parser.c"
 #include <esp_heap_caps.h>
-#include <hmc5883l.h>
+#include <qmc5883l.h>
 
 
 
 // define I2C display consts:
-#define I2C_DISPLAY_SCL_IO 22        /*!< gpio number for I2C master clock */
-#define I2C_DISPLAY_SDA_IO 21        /*!< gpio number for I2C master data  */
-#define I2C_DISPLAY_NUM I2C_NUM_0    /*!< I2C port number for master dev */
+#define I2C_DISPLAY_SCL_IO 19        /*!< gpio number for I2C master clock */
+#define I2C_DISPLAY_SDA_IO 18        /*!< gpio number for I2C master data  */
+#define I2C_DISPLAY_NUM I2C_NUM_1    /*!< I2C port number for master dev */
 #define I2C_DISPLAY_FREQ_HZ 200000   /*!< I2C master clock frequency */
 static ssd1306_handle_t ssd1306_dev = NULL;
-#define I2C_COMPASS_SCL_IO 19        /*!< gpio number for I2C master clock */
-#define I2C_COMPASS_SDA_IO 18        /*!< gpio number for I2C master data  */
-#define I2C_COMPASS_NUM I2C_NUM_1    /*!< I2C port number for master dev */
+#define I2C_COMPASS_SCL_IO 22        /*!< gpio number for I2C master clock */
+#define I2C_COMPASS_SDA_IO 21        /*!< gpio number for I2C master data  */
+#define I2C_COMPASS_NUM I2C_NUM_0    /*!< I2C port number for master dev */
 #define I2C_COMPASS_FREQ_HZ 400000   /*!< I2C master clock frequency */
-hmc5883l_dev_t compass;
+qmc5883l_t compass;
 // define GPS module consts:
 #define TXD_PIN (GPIO_NUM_17)
 #define RXD_PIN (GPIO_NUM_16)
@@ -35,6 +35,7 @@ static const int RX_BUF_SIZE = 1024;
 
 void setup()
 {
+	//scan();
 	i2cdev_init();
 
 // setup i2c display:
@@ -76,13 +77,31 @@ void setup()
     // i2c_param_config(I2C_COMPASS_NUM, &compass_conf);
     // i2c_driver_install(I2C_COMPASS_NUM, compass_conf.mode, 0, 0, 0);
 	
-	memset(&compass, 0, sizeof(hmc5883l_dev_t));
-	hmc5883l_init_desc(&compass, I2C_COMPASS_NUM, I2C_COMPASS_SDA_IO, I2C_COMPASS_SCL_IO);
-	hmc5883l_init(&compass);
-	hmc5883l_set_opmode(&compass, HMC5883L_MODE_CONTINUOUS);
-	hmc5883l_set_samples_averaged(&compass, HMC5883L_SAMPLES_8);
-	hmc5883l_set_data_rate(&compass, HMC5883L_DATA_RATE_07_50);
-	hmc5883l_set_gain(&compass, HMC5883L_GAIN_1090);
+	memset(&compass, 0, sizeof(qmc5883l_t));
+	if (qmc5883l_init_desc(&compass, QMC5883L_I2C_ADDR_DEF, 0, I2C_COMPASS_SDA_IO, I2C_COMPASS_SCL_IO) == ESP_OK)
+	{
+		printf("compass init OK\n");
+	};
+	if (qmc5883l_set_config(&compass, QMC5883L_DR_50, QMC5883L_OSR_128, QMC5883L_RNG_2) == ESP_OK)
+	{
+		printf("compass comfig OK\n");
+	};
+	// if (hmc5883l_set_opmode(&compass, HMC5883L_MODE_CONTINUOUS) == ESP_OK)
+	// {
+	// 	printf("compass opmode has been set\n");
+	// };
+	// if (hmc5883l_set_samples_averaged(&compass, HMC5883L_SAMPLES_8) == ESP_OK)
+	// {
+	// 	printf("compass samples averaged have beed set\n");
+	// };
+	// if (hmc5883l_set_data_rate(&compass, HMC5883L_DATA_RATE_07_50) == ESP_OK)
+	// {
+	// 	printf("compass data rate has been set\n");
+	// };
+	// if (hmc5883l_set_gain(&compass, HMC5883L_GAIN_1090) == ESP_OK)
+	// {
+	// 	printf("compass gain has been set\n");
+	// };
 
 };
 
@@ -91,7 +110,7 @@ void setup()
 
 static void rx_task(void *arg)
 {
-	static hmc5883l_data_t compass_data;
+	static qmc5883l_data_t compass_data;
 	static char display_text_1[32];
 	static char display_text_2[32];
 	static char display_text_3[32];
@@ -135,8 +154,15 @@ static void rx_task(void *arg)
 	while (1)
 	{
 		
-		hmc5883l_get_data(&compass, &compass_data);
-		printf("compass data: %.2f, %.2f, %.2f\n", compass_data.x, compass_data.y, compass_data.z);
+		if (qmc5883l_get_data(&compass, &compass_data) == ESP_OK)
+		{
+			snprintf(display_text_4, sizeof(display_text_4), "compass data: %.2f, %.2f, %.2f\n", compass_data.x, compass_data.y, compass_data.z);
+		}
+		else
+		{
+			snprintf(display_text_4, sizeof(display_text_4), "can't read compass data");
+		};
+		printf("%s", display_text_4);
 		const int rxBytes = uart_read_bytes(UART, data, RX_BUF_SIZE, pdMS_TO_TICKS(200));
 		if (rxBytes > 0)
 		{
@@ -167,7 +193,6 @@ static void rx_task(void *arg)
 			snprintf(display_text_1, sizeof(display_text_1), "%.5f%c  %.5f%c", latitude, lat_direction, longitude, long_direction);
 			snprintf(display_text_2, sizeof(display_text_2), "Time: %.2f", time);
 			snprintf(display_text_3, sizeof(display_text_3), "%i satellites", satellites_num);
-			snprintf(display_text_4, sizeof(display_text_4), "compass data: %.2f, %.2f, %.2f\n", compass_data.x, compass_data.y, compass_data.z);
 			snprintf(display_text_5, sizeof(display_text_5), "Dir: %.1f Spd: %.1f", direction, speed);
 
 			ssd1306_clear_screen(ssd1306_dev, 0x00);
